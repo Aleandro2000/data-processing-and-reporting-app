@@ -1,0 +1,40 @@
+LOGICAL STEPS
+
+Loading
+I put the CSVs into SQLite (db/reporting.db) and work from there afterwards.
+
+accounts.csv goes into accounts (I rename account_id to id).
+daily_*.csv goes into daily_status.
+monthly_*.csv goes into monthly_status. The month column is just 01, 02, etc,
+so I take year+month from the filename and store year_month as YYYY-MM.
+
+Some changed_datetime values were messy. Most look like 2025-11-26 01:31:07.
+A few look like 10-12-24 00:36, and a few look like Excel numbers (45667.06037).
+I convert those when loading. Then I do a quick check for empty tables / bad FKs.
+
+Activity since 2025-01-01
+Only from daily_status. If an account has any change on or after 2025-01-01,
+I keep the newest one in that period, join name/address, write
+accounts_activity_since_2025.csv.
+I skipped monthly here because the question is about activity, not snapshots.
+
+COLLECTIONS / LEGAL as of 27 Nov 2025
+Last daily row before 2025-11-27 00:00:00. If that queue is COLLECTIONS or LEGAL,
+include it. Data only goes up to 2025-11-26 anyway.
+
+I also compared with the November monthly file. Close but not identical, so I trust
+daily. One account had no daily row before the cut-off, so for that one I used
+the November monthly row and set the time to 2025-11-26 23:59:59.
+
+Output: latest_change_collections_legal.csv (same columns as the activity file).
+
+Performance
+Timed the query that reads daily statuses + account details for accounts that
+have ever been in COLLECTIONS or LEGAL.
+
+Slow version: SELECT d.* with a DISTINCT subquery, no indexes from me.
+Faster: small good_accounts table, fewer columns, indexes + ANALYZE, bigger cache.
+
+Checked that both return the same number of rows. Details in PERFORMANCE_REPORT.txt.
+
+More detail (schema, SQL, numbers, edge cases, interview answers) is in SOLUTION_NOTES.pdf.

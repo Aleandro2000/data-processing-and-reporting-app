@@ -1,0 +1,47 @@
+Performance notes
+
+I timed the query that returns daily status rows with account
+name/address for accounts that were ever in COLLECTIONS or LEGAL.
+
+Slow version:
+SELECT d.*, a.name, a.address
+FROM daily_status d
+JOIN accounts a ON a.id = d.account
+WHERE d.account IN (
+    SELECT DISTINCT account
+    FROM daily_status
+    WHERE queue IN (?, ?)
+)
+
+Faster version:
+SELECT d.account, d.queue, d.status, d.changed_datetime, d.source_file,
+       a.name, a.address
+FROM daily_status d
+JOIN accounts a ON a.id = d.account
+JOIN good_accounts g ON g.account = d.account
+
+What I changed:
+- made a good_accounts table once instead of DISTINCT each time
+- selected only the columns I need
+- added indexes and ran ANALYZE
+- increased the sqlite cache
+
+Median of 10 runs.
+444 accounts hit COLLECTIONS/LEGAL at some point.
+
+Slow plan:
+  SEARCH a USING INTEGER PRIMARY KEY (rowid=?)
+  LIST SUBQUERY 1
+  SCAN daily_status USING INDEX sqlite_autoindex_daily_status_1
+  REUSE LIST SUBQUERY 1
+  SEARCH d USING INDEX sqlite_autoindex_daily_status_1 (account=?)
+4.38 ms median, 3321 rows
+
+Faster plan:
+  SCAN a
+  SEARCH g USING INTEGER PRIMARY KEY (rowid=?)
+  SEARCH d USING INDEX idx_daily_account_dt (account=?)
+3.52 ms median, 3321 rows
+
+About 1.24x faster here.
+Same row count both times.
